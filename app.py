@@ -1,69 +1,211 @@
 import os
+import uuid
 import torch
-import uuid # Needed for unique session tracking
-os.environ["STREAMLIT_SERVER_ENABLE_FILE_WATCHER"] = "false"
-torch.classes.__path__ = []
-
 import streamlit as st
 import nest_asyncio
+
 from src.orchestrator import aura_app
 
+# -----------------------------
+# FIXES FOR STREAMLIT CLOUD
+# -----------------------------
+os.environ["STREAMLIT_SERVER_ENABLE_FILE_WATCHER"] = "false"
+torch.classes.__path__ = []
 nest_asyncio.apply()
 
-# 1. PAGE CONFIGURATION
-st.set_page_config(page_title="Aura Fin-Guard ROI Dashboard", layout="wide")
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
+st.set_page_config(
+    page_title="Aura Fin-Guard | Hybrid Banking AI",
+    page_icon="🛡️",
+    layout="wide"
+)
 
-# 2. SESSION STATE FOR MEMORY (Thread ID)
-# We generate a unique thread_id once per session
+# -----------------------------
+# DARK FINTECH THEME (CSS)
+# -----------------------------
+st.markdown("""
+<style>
+.stApp {
+    background-color: #0b1220;
+    color: #e5e7eb;
+}
+h1, h2, h3 {
+    color: #60a5fa;
+}
+.card {
+    background-color: #020617;
+    padding: 20px;
+    border-radius: 14px;
+    margin-bottom: 16px;
+}
+.highlight {
+    border-left: 4px solid #38bdf8;
+    padding-left: 12px;
+}
+.good { color: #22c55e; }
+.warn { color: #facc15; }
+.ai { color: #a78bfa; }
+textarea {
+    background-color: #020617 !important;
+    color: white !important;
+    border-radius: 12px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# SESSION STATE (MEMORY)
+# -----------------------------
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
-
-# 3. SIDEBAR: The ROI Tracker
-st.sidebar.title("💰 Live ROI Tracker")
-if 'total_savings' not in st.session_state:
-    st.session_state.total_savings = 0.0
-
-st.sidebar.metric("Total Money Saved", f"${st.session_state.total_savings:.2f}")
-st.sidebar.info(f"Session ID: {st.session_state.thread_id[:8]}") # Visual proof of memory
-st.sidebar.markdown("---")
-st.sidebar.info("Memory is active. The agent will remember context within this thread.")
-
-# 4. MAIN INTERFACE
-st.title("🛡️ Aura Fin-Guard")
-st.subheader("Intelligent & Cost-Aware Financial Agent")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+if "total_savings" not in st.session_state:
+    st.session_state.total_savings = 0.0
 
-# 5. CHAT INPUT & MEMORY LOGIC
-if prompt := st.chat_input("Ask a banking question..."):
-    st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# -----------------------------
+# SIDEBAR — ROI & MEMORY
+# -----------------------------
+st.sidebar.title("💰 ROI Dashboard")
+st.sidebar.metric(
+    "Total Cost Saved",
+    f"${st.session_state.total_savings:.2f}"
+)
+st.sidebar.info(f"🧵 Session ID: {st.session_state.thread_id[:8]}")
+st.sidebar.success("Memory Active (LangGraph Thread)")
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    "🚀 **Hybrid AI Routing**\n\n"
+    "- Simple → Local AI\n"
+    "- Complex → Reasoning Agent"
+)
 
-    # CONFIGURE MEMORY FOR THE GRAPH
-    # This config tells LangGraph which thread to look up in the Checkpointer
-    config = {"configurable": {"thread_id": st.session_state.thread_id}}
+# -----------------------------
+# HEADER
+# -----------------------------
+st.markdown("""
+# 🛡️ Aura Fin-Guard  
+### Hybrid Agentic Banking Orchestrator  
 
-    with st.spinner("Analyzing & Routing..."):
-        # We pass the config to enable memory access
-        result = aura_app.invoke({"query": prompt}, config=config)
-        response_text = result['response']
-        
-        if hasattr(response_text, 'content'):
-            response_text = response_text.content
+_Cost-aware AI system that routes banking queries intelligently_
+""")
 
-    # Update Savings Tracker
-    st.session_state.total_savings += result.get('cost_saved', 0.0)
+# -----------------------------
+# ARCHITECTURE VISUALIZATION
+# -----------------------------
+with st.expander("🏗️ System Architecture", expanded=True):
+    st.markdown("""
+    <div class="card">
+    <b>User Query</b>  
+    ⬇️  
+    <b>Intent Classifier</b> (Simple vs Complex)  
+    ⬇️  
+    <b>LangGraph Orchestrator</b> (Decision Router)  
 
-    # Display assistant response
-    with st.chat_message("assistant"):
-        st.markdown(f"**[Model: {result.get('model_used')}]**")
-        st.markdown(response_text)
-        if result.get('cost_saved') > 0:
-            st.success(f"✅ Saved ${result['cost_saved']} by using Local AI!")
+    🟢 <b class="good">Simple</b> → Local LLM (Ollama) → ₹0 Cost  
+    🟣 <b class="ai">Complex</b> → Reasoning Agent → Better Accuracy  
 
-    st.session_state.messages.append({"role": "assistant", "content": response_text})
+    ⬇️  
+    <b>Final Banking Response</b>
+    </div>
+    """, unsafe_allow_html=True)
+
+# -----------------------------
+# MAIN DASHBOARD LAYOUT
+# -----------------------------
+chat_col, status_col = st.columns([2, 1])
+
+# -----------------------------
+# CHAT HISTORY
+# -----------------------------
+with chat_col:
+    st.subheader("💬 Conversation")
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# -----------------------------
+# USER INPUT
+# -----------------------------
+prompt = st.chat_input("Ask a banking question...")
+
+if prompt:
+    # USER MESSAGE
+    st.session_state.messages.append(
+        {"role": "user", "content": prompt}
+    )
+    with chat_col:
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+    # CONFIG FOR LANGGRAPH MEMORY
+    config = {
+        "configurable": {
+            "thread_id": st.session_state.thread_id
+        }
+    }
+
+    # PROCESSING
+    with status_col:
+        st.markdown("### 🧠 System Decision")
+        with st.spinner("Analyzing & routing..."):
+            result = aura_app.invoke(
+                {"query": prompt},
+                config=config
+            )
+
+    response_text = result["response"]
+    if hasattr(response_text, "content"):
+        response_text = response_text.content
+
+    cost_saved = result.get("cost_saved", 0.0)
+    model_used = result.get("model_used", "Hybrid AI")
+
+    st.session_state.total_savings += cost_saved
+
+    # ASSISTANT RESPONSE
+    with chat_col:
+        with st.chat_message("assistant"):
+            st.markdown(
+                f"**Model Used:** `{model_used}`"
+            )
+            st.markdown(response_text)
+
+            if cost_saved > 0:
+                st.success(
+                    f"✅ Saved ${cost_saved:.2f} using Local AI"
+                )
+
+    st.session_state.messages.append(
+        {"role": "assistant", "content": response_text}
+    )
+
+    # SYSTEM STATUS PANEL
+    with status_col:
+        st.markdown(f"""
+        <div class="card highlight">
+        🔀 <b>Routing Decision</b><br>
+        Model: <b>{model_used}</b><br>
+        Cost Saved: <b class="good">${cost_saved:.2f}</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+# -----------------------------
+# WHY THIS MATTERS
+# -----------------------------
+with st.expander("🧠 Why this architecture matters"):
+    st.write("""
+    Traditional AI chatbots send all queries to the same large model,
+    increasing cost, latency, and privacy risk.
+
+    **Aura Fin-Guard** optimizes this by:
+    - Routing simple queries locally
+    - Escalating only when required
+    - Preserving user privacy
+    - Demonstrating real-world AI system design
+    """)
