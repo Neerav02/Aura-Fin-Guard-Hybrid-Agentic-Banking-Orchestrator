@@ -45,16 +45,25 @@ def intent_routing_node(state: AgentState):
     return {"intent": intent, "messages": [HumanMessage(content=state['query'])]}
 
 def call_local_slm(state: AgentState):
-    print("--- [ROUTING] -> LOCAL PHI-4 (FREE/SECURE) ---")
-    output = ollama.chat(model='phi4', messages=[
-        {'role': 'user', 'content': state['query']}
-    ])
-    response_text = output['message']['content']
+    print("--- [ROUTING] -> LOCAL/FALLBACK SLM ---")
+    try:
+        # Try local Ollama (Works when running locally)
+        output = ollama.chat(model='phi4', messages=[{'role': 'user', 'content': state['query']}])
+        response_text = output['message']['content']
+        model_name = "Microsoft Phi-4 (Local)"
+    except Exception:
+        # Fallback to a small cloud model (Works when deployed on the web)
+        print("⚠️ Local Ollama offline. Using Cloud Fallback...")
+        fallback_llm = ChatGroq(model="llama-3.2-1b-preview", groq_api_key=os.getenv("GROQ_API_KEY"))
+        res = fallback_llm.invoke([HumanMessage(content=state['query'])])
+        response_text = res.content
+        model_name = "Llama-3.2-1b (Cloud Fallback)"
+
     return {
         "response": response_text, 
         "messages": [AIMessage(content=response_text)],
         "cost_saved": 0.05, 
-        "model_used": "Microsoft Phi-4 (Local)"
+        "model_used": model_name
     }
 
 def call_premium_llm(state: AgentState):
