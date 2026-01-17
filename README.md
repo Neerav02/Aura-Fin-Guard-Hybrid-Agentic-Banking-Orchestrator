@@ -66,6 +66,7 @@ LangGraph Orchestrator (State Machine)
 ↓
 Final Response
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/d5d16503-5164-4dfd-9471-9821b8bce36f" />
 
 This architecture reflects how **modern AI platforms** build modular, agent-driven pipelines.
 
